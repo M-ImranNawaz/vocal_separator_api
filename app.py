@@ -171,9 +171,16 @@ async def separate(file: UploadFile = File(...)):
     # Return the JSON response
     return JSONResponse(content=response)
 
+#download files
 @app.get("/download")
 async def download(file_path: str):
     return FileResponse(path=file_path, filename=os.path.basename(file_path), media_type='audio/wav')
+
+# home
+@app.get("/")
+def home():
+    return 'Welcome to my api world'
+
 
 
 
