@@ -14,13 +14,13 @@
 
 # # Path to your audio file
 # AUDIO_FILE_PATH = '/Users/imrannawaz/Documents/Rolling in the Deep.mp3'
-# OUTPUT_PATH = "/Users/imrannawaz/Documents/output/"
+# output_path = "/Users/imrannawaz/Documents/output/"
 # # device = "cuda"  # Use "cuda" if you have a compatible GPU
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # # Ensure output directory exists
-# if not os.path.exists(OUTPUT_PATH):
-#     os.makedirs(OUTPUT_PATH)
+# if not os.path.exists(output_path):
+#     os.makedirs(output_path)
 
 # # Initialize the model
 # demucs = models.Demucs(name="hdemucs_mmi", other_metadata={"segment": 2, "split": True}, device=device, logger=None)
@@ -36,10 +36,10 @@
 # other = res["other"].cpu().numpy()
 
 # # Save the separated tracks
-# audiofile.write(os.path.join(OUTPUT_PATH, 'vocals.mp3'), vocals, 44100)
-# audiofile.write(os.path.join(OUTPUT_PATH, 'bass.mp3'), bass, 44100)
-# audiofile.write(os.path.join(OUTPUT_PATH, 'drums.mp3'), drums, 44100)
-# audiofile.write(os.path.join(OUTPUT_PATH, 'other.mp3'), other, 44100)
+# audiofile.write(os.path.join(output_path, 'vocals.mp3'), vocals, 44100)
+# audiofile.write(os.path.join(output_path, 'bass.mp3'), bass, 44100)
+# audiofile.write(os.path.join(output_path, 'drums.mp3'), drums, 44100)
+# audiofile.write(os.path.join(output_path, 'other.mp3'), other, 44100)
 
 # print("Audio separation complete. Separated files saved as 'vocals.wav', 'bass.wav', 'drums.wav', and 'other.wav'.")
 
@@ -81,12 +81,12 @@
 #     vocals = res["vocals"].cpu().numpy()
 #     music = (res["bass"] + res["drums"] + res["other"]).cpu().numpy()
 
-#     OUTPUT_PATH = "temp/output/"
-#     os.makedirs(OUTPUT_PATH, exist_ok=True)
+#     output_path = "temp/output/"
+#     os.makedirs(output_path, exist_ok=True)
 
 #     # Save the separated tracks
-#     vocals_path = os.path.join(OUTPUT_PATH, 'vocals.wav')
-#     music_path = os.path.join(OUTPUT_PATH, 'music.wav')
+#     vocals_path = os.path.join(output_path, 'vocals.wav')
+#     music_path = os.path.join(output_path, 'music.wav')
 #     audiofile.write(vocals_path, vocals, 44100)
 #     audiofile.write(music_path, music, 44100)
 
@@ -98,7 +98,7 @@
 
 
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 import shutil
 import os
@@ -107,69 +107,87 @@ import audiofile
 import torch
 from src.utils.get_models import download_all_models
 from src import models
+import logging
+
+logger = logging.getLogger('uvicorn.error')
+logger.setLevel(logging.DEBUG)
 
 app = FastAPI()
 
 # Load model configuration
 models_json = json.load(open("src/models_dir/models.json", "r"))
+logger.debug('model loaded')
 
 # Download all models (if not already downloaded)
 download_all_models(models_json)
+logger.debug('downloaded')
 
 # Initialize the model
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
 demucs = models.Demucs(name="hdemucs_mmi", other_metadata={"segment": 2, "split": True}, device=device, logger=None)
+logger.debug('initialized ')
 
 @app.post("/separate")
-async def separate(file: UploadFile = File(...)):
+async def separate(file: UploadFile = File(...), stems: int = 2):
     # Save the uploaded file
-    audio_path = f"temp/{file.filename}"
-    with open(audio_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        if stems not in [2, 4]:
+            raise HTTPException(status_code=400, detail="Invalid stems parameter. Only 2 or 4 are allowed.")
+        
+        audio_path = f"temp/{file.filename}"
+        with open(audio_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # Process the file
-    res = demucs(audio_path)
-    print(res)
-    # Access the separated audio directly
-    vocals = res["vocals"].cpu().numpy()
-    bass = res["bass"].cpu().numpy()
-    drums = res["drums"].cpu().numpy()
-    other = res["other"].cpu().numpy()
+        # Process the file
+        res = demucs(audio_path)
+        print(res)
+        # Access the separated audio directly
+        vocals = res["vocals"].cpu().numpy()
+        if stems == 4:
+            bass = res["bass"].cpu().numpy()
+            drums = res["drums"].cpu().numpy()
+            other = res["other"].cpu().numpy()
+        if stems == 2:
+            music = (res["bass"] + res["drums"] + res["other"]).cpu().numpy()
 
-    OUTPUT_PATH = "temp/output/"
-    os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-    # # Save the separated tracks
-    vocals_path = os.path.join(OUTPUT_PATH, 'vocals.mp3')
-    bass_path = os.path.join(OUTPUT_PATH, 'bass.mp3')
-    drums_path = os.path.join(OUTPUT_PATH, 'drums.mp3')
-    other_path = os.path.join(OUTPUT_PATH, 'other.mp3')
+        output_path = "temp/output/"
+        os.makedirs(output_path, exist_ok=True)    
 
-    # audiofile.write(vocals_path, vocals, 44100)
-    # audiofile.write(bass_path, bass, 44100)
-    # audiofile.write(drums_path, drums, 44100)
-    # audiofile.write(other_path, other, 44100)
+        # # Save the separated tracks
+        vocals_path = os.path.join(output_path, 'vocals.mp3')
+        if stems == 4:
+            bass_path = os.path.join(output_path, 'bass.mp3')
+            drums_path = os.path.join(output_path, 'drums.mp3')
+            other_path = os.path.join(output_path, 'other.mp3')
+        if stems == 2:
+            music_path = os.path.join(output_path, 'music.mp3')
 
-# vocals = res["vocals"].cpu().numpy()
-# bass = res["bass"].cpu().numpy()
-# drums = res["drums"].cpu().numpy()
-# other = res["other"].cpu().numpy()
+        # Save the separated tracks
+        audiofile.write(vocals_path, vocals, 44100)
+        if stems == 4:
+            audiofile.write(bass_path, bass, 44100)
+            audiofile.write(drums_path, drums, 44100)
+            audiofile.write(other_path, other, 44100)
+        if stems == 2:
+            audiofile.write(music_path, music, 44100)
+        # Create a JSON response with the paths to the separated files
+        response = {
+            "vocals.mp3": output_path,
+            "bass.mp3": output_path,
+            "drums.mp3": output_path,
+            "other.mp3": output_path
+        } if stems == 4 else {
+            "vocals.mp3": output_path,
+            "music.mp3": output_path
+        }
 
-# Save the separated tracks
-    audiofile.write(vocals_path, vocals, 44100)
-    audiofile.write(bass_path, bass, 44100)
-    audiofile.write(drums_path, drums, 44100)
-    audiofile.write(other_path, other, 44100)
-    # Create a JSON response with the paths to the separated files
-    response = {
-        "vocals": OUTPUT_PATH,
-        "bass": OUTPUT_PATH,
-        "drums": OUTPUT_PATH,
-        "other": OUTPUT_PATH
-    }
 
-    # Return the JSON response
-    return JSONResponse(content=response)
+        # Return the JSON response
+        return JSONResponse(content=response)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred during audio separation: {str(e)}")
 
 #download files
 @app.get("/download")
