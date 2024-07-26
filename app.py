@@ -6,7 +6,7 @@ import json
 import logging
 import audiofile
 
-from fastapi import FastAPI,  Depends, File, UploadFile, HTTPException, Security
+from fastapi import FastAPI,  Depends, File, UploadFile, HTTPException, Security, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security.api_key import APIKeyHeader
 
@@ -39,6 +39,7 @@ async def get_api_key(api_key: str = Security(api_key_header)):
     Returns:
         _type_: _description_
     """
+    # logger.debug(f"{api_key}  ==  {API_KEY}       result = {api_key == API_KEY}")
     if api_key == API_KEY:
         return api_key
     else:
@@ -63,7 +64,7 @@ DEMUCS = models.Demucs(name="hdemucs_mmi", other_metadata=META, device=DEVICE, l
 logger.debug('initialized ')
 
 @app.post("/separate")
-async def separate(file: UploadFile = File(...), stems: int = 2,
+async def separate(request: Request,file: UploadFile = File(...), stems: int = 2,
                     user_id = None, api_key: str = Depends(get_api_key)):
     """_summary_
 
@@ -74,7 +75,9 @@ async def separate(file: UploadFile = File(...), stems: int = 2,
         user_id (_type_, optional): _description_. Defaults to None.
     """
     # Save the uploaded file
-    logger.debug(api_key)
+    # headers = request.headers
+    # logger.debug(headers)
+    # logger.debug(api_key)
     try:
         if stems not in [2, 4]:
             msg = "Invalid stems parameter. Only 2 or 4 are allowed."
@@ -137,7 +140,7 @@ async def separate(file: UploadFile = File(...), stems: int = 2,
 
 #download files
 @app.get("/download")
-async def download(file_path: str):
+async def download(file_path: str, api_key: str = Depends(get_api_key)):
     """_summary_
     donwnload files
     """
@@ -148,21 +151,13 @@ async def download(file_path: str):
     file_name = os.path.basename(file_path)
     return FileResponse(path=file_path, filename=file_name, media_type='audio/mp3')
 
-# home
-@app.get("/")
-def home():
-    """_summary_
-    demo home
-    """
-    return 'Welcome to my api world'
-
 @app.delete("/delete/{folder_name}")
-async def delete_folder(folder_name: str):
+async def delete_folder(folder_name: str, api_key: str = Depends(get_api_key)):
     """_summary_
     delete the cache songs of th current use here folder_name is the id of user
     """
     # Construct the folder path (assumes folders are in the current working directory)
-    folder_name = f'temp/{folder_name}'
+    folder_name = f'temp/output/{folder_name}'
     folder_path = os.path.join(os.getcwd(), folder_name)
     logger.debug(folder_name)
 
@@ -176,3 +171,12 @@ async def delete_folder(folder_name: str):
         return {"message": f"Folder '{folder_name}' deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}") from e
+
+
+# home
+@app.get("/")
+def home():
+    """_summary_
+    demo home
+    """
+    return 'Welcome to my api world'
