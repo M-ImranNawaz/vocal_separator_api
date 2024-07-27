@@ -31,13 +31,14 @@ ffmpeg*
 
 **/weights/
 
-base.mp3
+bass.mp3
 drums.mp3
 vocals.mp3
 other.mp3
+music.mp3
 
 **/*.wav
-**/*.mp3
+# **/*.mp3
 **/*.flac
 **/.pytest_cache
 
