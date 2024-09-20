@@ -6,7 +6,7 @@ import json
 import logging
 import audiofile
 
-from fastapi import FastAPI,  Depends, File, UploadFile, HTTPException, Security, Request
+from fastapi import FastAPI,  Depends, File, UploadFile, HTTPException, Security
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security.api_key import APIKeyHeader
 
@@ -48,7 +48,6 @@ async def get_api_key(api_key: str = Security(api_key_header)):
         )
 
 
-
 # Load model configuration
 models_json = json.load(open("src/models_dir/models.json", "r", encoding= "utf-8"))
 logger.debug('model loaded')
@@ -63,8 +62,9 @@ META = {"segment": 2, "split": True}
 DEMUCS = models.Demucs(name="hdemucs_mmi", other_metadata=META, device=DEVICE, logger=None)
 logger.debug('initialized ')
 
+# separate a song into 4 stems
 @app.post("/separate")
-async def separate(request: Request,file: UploadFile = File(...), stems: int = 2,
+async def separate(file: UploadFile = File(...), stems: int = 2,
                     user_id = None, api_key: str = Depends(get_api_key)):
     """_summary_
 
@@ -138,7 +138,7 @@ async def separate(request: Request,file: UploadFile = File(...), stems: int = 2
         detail = f"An error occurred during audio separation: {str(e)}"
         raise HTTPException(status_code=500, detail=detail) from e
 
-#download files
+# download files
 @app.get("/download")
 async def download(file_path: str, api_key: str = Depends(get_api_key)):
     """_summary_
@@ -151,6 +151,7 @@ async def download(file_path: str, api_key: str = Depends(get_api_key)):
     file_name = os.path.basename(file_path)
     return FileResponse(path=file_path, filename=file_name, media_type='audio/mp3')
 
+# delete a folder
 @app.delete("/delete/{folder_name}")
 async def delete_folder(folder_name: str, api_key: str = Depends(get_api_key)):
     """_summary_
