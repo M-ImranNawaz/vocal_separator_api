@@ -1,0 +1,17 @@
+output files
+
+[/Users/imrannawaz/.docker/config.json]
+
+{
+	"auths": {},
+	"credHelpers": {
+		"asia.gcr.io": "gcloud",
+		"eu.gcr.io": "gcloud",
+		"gcr.io": "gcloud",
+		"marketplace.gcr.io": "gcloud",
+		"staging-k8s.gcr.io": "gcloud",
+		"us-central1-docker.pkg.dev": "gcloud",
+		"us.gcr.io": "gcloud"
+	},
+	"currentContext": "desktop-linux"
+}
